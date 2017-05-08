@@ -129,6 +129,9 @@
         <item name="android:layout_width">wrap_content</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">20sp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:text">15</item>
+        <item name="android:gravity">center</item>
     </style>
 
     <style name="ScoreToast">
@@ -138,13 +141,34 @@
         <item name="android:layout_marginBottom">20dp</item>
     </style>
 
+
     <style name="ScoresBox">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:background">#f0f0f0</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:layout_marginTop">0dp</item>
+        <item name="android:padding">20dp</item>
+        <item name="android:layout_gravity">top</item>
+        <item name="android:layout_height">0dp</item>
+        <item name="android:layout_weight">2</item>
+    </style>
+    <style name="OptionsBox">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:background">#f0f0f0</item>
-        <item name="android:orientation">vertical</item>
-        <item name="android:layout_marginTop">30dp</item>
-        <item name="android:padding">20dp</item>
+        <item name="android:orientation">horizontal</item>
+        <item name="android:layout_marginTop">0dp</item>
+        <item name="android:padding">5dp</item>
+        <item name="android:layout_marginBottom">0dp</item>
+    </style>
+    <style name="OptionButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:background">@color/AccentColor</item>
+        <item name="android:textColor">@color/ButtonTextColor</item>
+        <item name="android:paddingLeft">2dp</item>
+        <item name="android:paddingRight">2dp</item>
     </style>
 
     <style name="ButtonsBox">
@@ -157,10 +181,11 @@
     </style>
 
     <style name="ScoreText">
-        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_weight">1</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:textSize">18sp</item>
-        <item name="android:layout_marginBottom">10dp</item>
+        <item name="android:layout_marginBottom">5dp</item>
         <item name="android:gravity">left</item>
     </style>
 

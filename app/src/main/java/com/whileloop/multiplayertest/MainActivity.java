@@ -1,5 +1,8 @@
 package com.whileloop.multiplayertest;
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.os.Debug;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.app.Activity;
@@ -9,6 +12,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.TextView;
 
 import com.google.android.gms.common.ConnectionResult;
@@ -46,7 +50,7 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
      * the game with the Google Play game services API.
      */
 
-    final static String TAG = "ButtonClicker2000";
+    final static String TAG = "PT Multiplayer";
 
     // Request codes for the UIs that we show with startActivityForResult:
     final static int RC_SELECT_PLAYERS = 10000;
@@ -98,9 +102,12 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
     // This array lists all the individual screens our game has.
     final static int[] SCREENS = {
             R.id.screen_game, R.id.screen_main, R.id.screen_sign_in,
-            R.id.screen_wait
+            R.id.screen_wait, R.id.screen_gameover
     };
     int mCurScreen = -1;
+
+    View view;
+    MultiplayerQuestionLoad mpQLoad;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -111,7 +118,8 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
                 .addOnConnectionFailedListener(this)
                 .addApi(Games.API).addScope(Games.SCOPE_GAMES)
                 .build();
-
+        mpQLoad = new MultiplayerQuestionLoad();
+        view = findViewById(R.id.screen_game);
         // set up a click listener for everything we care about
         for (int id : CLICKABLES) {
             findViewById(id).setOnClickListener(this);
@@ -178,19 +186,19 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
                 break;
             case R.id.option1:
                 // (gameplay) user clicked the option 01
-                scoreOnePoint(1);
+                scoreOnePoint(1,R.id.option1);
                 break;
             case R.id.option2:
                 // (gameplay) user clicked the option 01
-                scoreOnePoint(2);
+                scoreOnePoint(2,R.id.option2);
                 break;
             case R.id.option3:
                 // (gameplay) user clicked the option 01
-                scoreOnePoint(3);
+                scoreOnePoint(3,R.id.option3);
                 break;
             case R.id.option4:
                 // (gameplay) user clicked the option 01
-                scoreOnePoint(4);
+                scoreOnePoint(4,R.id.option4);
                 break;
         }
     }
@@ -628,18 +636,44 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
     /*
      * GAME LOGIC SECTION. Methods that implement the game's rules.
      */
+    //question bank
+    MultiplayerQuestion[] questionbank = new MultiplayerQuestion[]{
+            new MultiplayerQuestion(
+                    "Go 4 steps forward",
+                    "ArrayA = [3,4,1,0];\n" + "sort ArrayA in ________;\n" + "X = ArrayA[0];\n" + "Go X steps forward;",
+                    2,
+                    "accending","decending","random","same order"
+                    ),
+            new MultiplayerQuestion(
+                    "Go 1 steps forward",
+                    "ArrayA = [3,4,1,0];\n" + "sort ArrayA in ________;\n" + "X = ArrayA[1];\n" + "Go X steps forward;",
+                    3,
+                    "random","same order","accending","decending"
+            ),
+            new MultiplayerQuestion(
+                    "Go 4 steps forward",
+                    "ArrayA = [3,4,1,0];\n" + "sort ArrayA in ________;\n" + "X = ArrayA[0];\n" + "Go X steps forward;",
+                    2,
+                    "accending","decending","random","increasing order"
+            )
+
+    };
 
     // Current state of the game:
     int mSecondsLeft = -1; // how long until the game ends (seconds)
-    final static int GAME_DURATION = 20; // game duration, seconds.
+    final static int GAME_DURATION = 15; // game duration, seconds.
     int mScore = 0; // user's current score
-
-    int currentQuestion = 0;
+    int lastAnsweredQuestion = 0;
+    int currentQuestion = 1;
+    int opponentQuestion = 0;
+    int opponentScore = 0;
     // Reset game variables in preparation for a new game.
     void resetGameVars() {
         mSecondsLeft = GAME_DURATION;
         mScore = 0;
-        currentQuestion = 0;
+        lastAnsweredQuestion = 0;
+        opponentScore = 0;
+        currentQuestion = 1;
         mParticipantScore.clear();
         mFinishedParticipants.clear();
     }
@@ -651,11 +685,7 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
         broadcastScore(false);
         switchToScreen(R.id.screen_game);
 
-        findViewById(R.id.option1).setVisibility(View.VISIBLE);
-        findViewById(R.id.option2).setVisibility(View.VISIBLE);
-        findViewById(R.id.option3).setVisibility(View.VISIBLE);
-        findViewById(R.id.option4).setVisibility(View.VISIBLE);
-
+        setQuestion();
         // run the gameTick() method every second to update the game.
         final Handler h = new Handler();
         h.postDelayed(new Runnable() {
@@ -674,30 +704,113 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
         if (mSecondsLeft > 0)
             --mSecondsLeft;
 
+
         // update countdown
         ((TextView) findViewById(R.id.countdown)).setText("0:" +
                 (mSecondsLeft < 10 ? "0" : "") + String.valueOf(mSecondsLeft));
 
-        if (mSecondsLeft <= 0) {
-            // finish game
+        if(mSecondsLeft<=0){
+            //move to next question when time reaches 0
+            nextQuestion();
+        }
+    }
+    void nextQuestion(){
+        ++currentQuestion;
+        if(currentQuestion<=3){
+            //have questions left
+            mSecondsLeft = GAME_DURATION;
+            setQuestion();
+        }else{
+            //all questions are over, finish game
             findViewById(R.id.option1).setVisibility(View.GONE);
             findViewById(R.id.option2).setVisibility(View.GONE);
             findViewById(R.id.option3).setVisibility(View.GONE);
             findViewById(R.id.option4).setVisibility(View.GONE);
-            broadcastScore(true);
+            mSecondsLeft = 0;
+            switchToScreen(R.id.screen_gameover);
+            if(opponentScore<mScore){
+                ((TextView)findViewById(R.id.winloose)).setText("YOU WON");
+                ((TextView)findViewById(R.id.winlostpoints)).setText("By "+(mScore-opponentScore));
+            }else if(opponentScore>mScore){
+                ((TextView)findViewById(R.id.winloose)).setText("YOU LOST");
+                ((TextView)findViewById(R.id.winlostpoints)).setText("By "+(opponentScore-mScore));
+            }else{
+                ((TextView)findViewById(R.id.winloose)).setText("TIE!");
+                ((TextView)findViewById(R.id.winlostpoints)).setText("");
+            }
+
         }
+        broadcastScore(true);
+
+        view.animate()
+                .translationY(0)
+                .alpha(0.0f)
+                .setListener(new AnimatorListenerAdapter() {
+                    @Override
+                    public void onAnimationEnd(Animator animation) {
+                        super.onAnimationEnd(animation);
+                        view.animate().alpha(1);
+                        //view.setVisibility(View.GONE);
+                    }
+                });
+    }
+    void setQuestion(){
+        MultiplayerQuestion ques = questionbank[currentQuestion-1];
+        ((TextView)findViewById(R.id.instructions)).setText(ques.title);
+        ((TextView)findViewById(R.id.description)).setText(ques.question);
+
+        findViewById(R.id.option1).setVisibility(View.VISIBLE);
+        findViewById(R.id.option2).setVisibility(View.VISIBLE);
+        findViewById(R.id.option3).setVisibility(View.VISIBLE);
+        findViewById(R.id.option4).setVisibility(View.VISIBLE);
+
+        ((Button)findViewById(R.id.option1)).setText(ques.options.get(0));
+        ((Button)findViewById(R.id.option2)).setText(ques.options.get(1));
+        ((Button)findViewById(R.id.option3)).setText(ques.options.get(2));
+        ((Button)findViewById(R.id.option4)).setText(ques.options.get(3));
     }
 
     // indicates the player scored one point
-    void scoreOnePoint(int selected) {
+    void scoreOnePoint(int selected,int optionui_id) {
         if (mSecondsLeft <= 0)
             return; // too late!
-        ++mScore;
+        // broadcast our level
+        if(lastAnsweredQuestion<currentQuestion){
+            broadcastQuesAnswered(currentQuestion);
+        }
+        if(selected==questionbank[currentQuestion-1].answer && lastAnsweredQuestion<currentQuestion){
+            //scoring criteria, 10+(2*mSecondsLeft) for correct answer
+            mScore += 10+(2*mSecondsLeft);
+            //++mScore;
+        }
+        lastAnsweredQuestion = currentQuestion;
+
+        findViewById(R.id.option1).setVisibility(View.GONE);
+        findViewById(R.id.option2).setVisibility(View.GONE);
+        findViewById(R.id.option3).setVisibility(View.GONE);
+        findViewById(R.id.option4).setVisibility(View.GONE);
+
+        findViewById(optionui_id).setVisibility(View.VISIBLE);
+
         updateScoreDisplay();
         updatePeerScoresDisplay();
 
-        // broadcast our new score to our peers
+        // broadcast new score to our peers
         broadcastScore(false);
+
+        //if opponent has finished
+        if(opponentQuestion==currentQuestion){
+            nextQuestion();
+        }
+    }
+
+    //move to next question when both are finished one question. this is called when opponent finished a question
+    void moveNextQuestion(int opponentLevel){
+        opponentQuestion = opponentLevel;
+        if(lastAnsweredQuestion==currentQuestion){
+            //then I'm finished answering question
+            nextQuestion();
+        }
     }
 
     /*
@@ -738,6 +851,7 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
                 // lose points,
                 // we'd have to add a "serial number" to the packet.
                 mParticipantScore.put(sender, thisScore);
+                opponentScore = thisScore;
             }
 
             // update the scores on the screen
@@ -748,6 +862,8 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
             if ((char) buf[0] == 'F') {
                 mFinishedParticipants.add(rtm.getSenderParticipantId());
             }
+        }else if(buf[0]=='N'){
+            moveNextQuestion((int)buf[1]);
         }
     }
 
@@ -777,6 +893,19 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
                 Games.RealTimeMultiplayer.sendUnreliableMessage(mGoogleApiClient, mMsgBuf, mRoomId,
                         p.getParticipantId());
             }
+        }
+    }
+    void broadcastQuesAnswered(int level){
+        byte[] msg = new byte[]{(byte)'N',(byte)level} ;
+        for (Participant p : mParticipants) {
+            if (p.getParticipantId().equals(mMyId))
+                continue;
+            if (p.getStatus() != Participant.STATUS_JOINED)
+                continue;
+
+            Games.RealTimeMultiplayer.sendReliableMessage(mGoogleApiClient, null, msg,
+                        mRoomId, p.getParticipantId());
+
         }
     }
 
@@ -821,7 +950,7 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
 
     // updates the label that shows my score
     void updateScoreDisplay() {
-        ((TextView) findViewById(R.id.my_score)).setText(formatScore(mScore));
+        ((TextView) findViewById(R.id.score0)).setText(formatScore(mScore)+ " - You");
     }
 
     // formats a score as a three-digit number
@@ -834,9 +963,9 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
 
     // updates the screen with the scores from our peers
     void updatePeerScoresDisplay() {
-        ((TextView) findViewById(R.id.score0)).setText(formatScore(mScore) + " - Me");
+        //((TextView) findViewById(R.id.score0)).setText(formatScore(mScore) + " - You");
         int[] arr = {
-                R.id.score1, R.id.score2, R.id.score3
+                R.id.score1,R.id.score0
         };
         int i = 0;
 
@@ -848,8 +977,9 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
                 if (p.getStatus() != Participant.STATUS_JOINED)
                     continue;
                 int score = mParticipantScore.containsKey(pid) ? mParticipantScore.get(pid) : 0;
+                Log.i("Opponent",score+"");
                 ((TextView) findViewById(arr[i])).setText(formatScore(score) + " - " +
-                        p.getDisplayName());
+                        "Opponent");//p.getDisplayName());
                 ++i;
             }
         }
@@ -857,6 +987,7 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
         for (; i < arr.length; ++i) {
             ((TextView) findViewById(arr[i])).setText("");
         }
+        ((TextView) findViewById(R.id.score0)).setText(formatScore(mScore)+ " - You");
     }
 
     /*
