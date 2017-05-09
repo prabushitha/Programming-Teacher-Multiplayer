@@ -34,6 +34,7 @@ import com.google.android.gms.games.multiplayer.realtime.RoomUpdateListener;
 import com.google.example.games.basegameutils.BaseGameUtils;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -658,7 +659,39 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
             )
 
     };
+    void generateGameQuestions(){
+        int q1 = (myQids[0]+oppoQids[0])%mpQLoad.TOTAL_QUESTIONS;
+        int q2 = (myQids[1]+oppoQids[1])%mpQLoad.TOTAL_QUESTIONS;
+        int q3 = (myQids[2]+oppoQids[2])%mpQLoad.TOTAL_QUESTIONS;
 
+        while(q1==q2 || q1==q3 || q2==q3){
+            q1=(q1+1)%mpQLoad.TOTAL_QUESTIONS;
+            q2=(q2+2)%mpQLoad.TOTAL_QUESTIONS;
+            q3=(q3+3)%mpQLoad.TOTAL_QUESTIONS;
+        }
+
+        questionbank = mpQLoad.getQuestions(q1,q2,q3);
+    }
+    int[] getRandomNumbers(int amount){
+        ArrayList<Integer> list = new ArrayList<Integer>();
+        int[] response = new int[amount];
+        if(mpQLoad.doneQuestionLoad && mpQLoad.TOTAL_QUESTIONS>=3){
+            for(int i=0;i<mpQLoad.TOTAL_QUESTIONS;i++){
+                list.add(new Integer(i));
+            }
+            Collections.shuffle(list);
+            for(int j=0;j<amount;j++){
+                response[j] = list.get(j);
+                Log.i("Random ","Num"+j+":"+response[j]);
+            }
+        }else{
+            Log.i("Question Load","Error Loading:"+mpQLoad.doneQuestionLoad+" :"+mpQLoad.TOTAL_QUESTIONS);
+        }
+        return response;
+    }
+    //question ids
+    int[] myQids;
+    int[] oppoQids;
     // Current state of the game:
     int mSecondsLeft = -1; // how long until the game ends (seconds)
     final static int GAME_DURATION = 15; // game duration, seconds.
@@ -673,18 +706,33 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
         mScore = 0;
         lastAnsweredQuestion = 0;
         opponentScore = 0;
+        opponentQuestion = 0;
         currentQuestion = 1;
         mParticipantScore.clear();
         mFinishedParticipants.clear();
+        myQids = null;
+        oppoQids = null;
     }
 
     // Start the gameplay phase of the game.
     void startGame(boolean multiplayer) {
         mMultiplayer = multiplayer;
+        resetGameVars();
+
+        //generating qids
+        myQids = getRandomNumbers(3);
+
+        broadcastQuesIds(myQids);
+        //wait till opponent send data
+
+    }
+    void startPlay(){
+        generateGameQuestions();
+
+
         updateScoreDisplay();
         broadcastScore(false);
         switchToScreen(R.id.screen_game);
-
         setQuestion();
         // run the gameTick() method every second to update the game.
         final Handler h = new Handler();
@@ -864,6 +912,13 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
             }
         }else if(buf[0]=='N'){
             moveNextQuestion((int)buf[1]);
+        }else if(buf[0]=='M'){
+            Log.i("Ques Ids",""+(int)buf[1]+""+(int)buf[2]+""+(int)buf[3]);
+            oppoQids = new int[]{(int)buf[1],(int)buf[2],(int)buf[3]};
+            startPlay();
+        }else{
+
+            Log.i("Invaliddddd","asdasd");
         }
     }
 
@@ -905,6 +960,19 @@ public class MainActivity extends AppCompatActivity  implements GoogleApiClient.
 
             Games.RealTimeMultiplayer.sendReliableMessage(mGoogleApiClient, null, msg,
                         mRoomId, p.getParticipantId());
+
+        }
+    }
+    void broadcastQuesIds(int[] ids){
+        byte[] msg = new byte[]{(byte)'M',(byte)ids[0], (byte)ids[1], (byte)ids[2]} ;
+        for (Participant p : mParticipants) {
+            if (p.getParticipantId().equals(mMyId))
+                continue;
+            if (p.getStatus() != Participant.STATUS_JOINED)
+                continue;
+
+            Games.RealTimeMultiplayer.sendReliableMessage(mGoogleApiClient, null, msg,
+                    mRoomId, p.getParticipantId());
 
         }
     }

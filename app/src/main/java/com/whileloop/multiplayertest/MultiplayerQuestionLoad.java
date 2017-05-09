@@ -45,6 +45,7 @@ public class MultiplayerQuestionLoad {
             @Override
             public void onDataChange(DataSnapshot dataSnapshot) {
                 TOTAL_QUESTIONS=0;
+                allQuestions = new ArrayList<MultiplayerQuestion>();
                 for(DataSnapshot d:dataSnapshot.getChildren()){
                     MultiplayerQuestion question = d.getValue(MultiplayerQuestion.class);
                     allQuestions.add(question);
